@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PUBG Peeking Practice (EDC/QAC)</title>
+    <title>PUBG Peeking Practice</title>
     <style>
         :root {
             --bg-color: #1a1a1a;
@@ -31,7 +31,19 @@
         .layout-wrapper {
             display: flex;
             gap: 20px;
-            align-items: flex-start;
+            align-items: center;
+            flex-direction: column;
+            width: 80%;
+            max-width: 1600px;
+            /* Optional max-width */
+            margin: 20px auto;
+        }
+
+        .top-row {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            justify-content: center;
         }
 
 
@@ -61,27 +73,44 @@
 
         #game-container {
             position: relative;
-            width: 600px;
-            height: 600px;
+            /* Width handled by flex */
+            height: 480px;
             /* Increased height for log space */
             background-color: #252525;
-            border: 2px solid #444;
+            border: 1px solid #444;
             display: flex;
-            justify-content: center;
-            align-items: center;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: stretch;
             overflow: hidden;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            flex: 2;
+            /* Game is 2x wider than side panels */
+        }
+
+        .game-header {
+            padding: 10px;
+            font-size: 1.1rem;
+            color: #ddd;
+            border-bottom: 1px solid #444;
+            background: #252525;
+            z-index: 10;
         }
 
         /* 3D-like Perspective */
         .scene {
             position: relative;
             width: 100%;
-            height: 100%;
+            flex: 1;
+            /* Fill remaining height */
             perspective: 800px;
             display: flex;
             justify-content: center;
             align-items: center;
             z-index: 0;
+            background: #222;
+            /* Scene background */
         }
 
         #cover {
@@ -97,7 +126,7 @@
             color: rgba(255, 255, 255, 0.2);
             font-weight: bold;
             font-size: 1.2rem;
-            bottom: 250px;
+            bottom: 200px;
             /* Align bottom */
         }
 
@@ -112,7 +141,7 @@
             border-radius: 5px;
             border-radius: 5px;
             /* Center behind cover */
-            bottom: 250px;
+            bottom: 200px;
             /* Align bottom */
             transform-origin: bottom center;
         }
@@ -156,7 +185,8 @@
 
         /* Stats Panel - Moved to Top Left */
         /* Stats Panel - Side */
-        #stats-panel {
+        #stats-panel,
+        #instructions-panel {
             width: 250px;
             background: #252525;
             padding: 15px;
@@ -165,38 +195,44 @@
             border: 1px solid #444;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
             box-sizing: border-box;
-            height: fit-content;
+            height: 480px;
+            flex: 1;
+            /* Responsive flex */
+            max-width: 300px;
+            /* Limit width */
         }
 
-        /* Log Panel - Bottom Full Width */
+        /* Log Panel - Side Right */
         #log-panel {
-            position: absolute;
-            bottom: 0;
-            left: 0;
+            /* flex: 1; removed */
+            /* Height and position changed */
             width: 100%;
-            height: 150px;
-            background: rgba(0, 0, 0, 0.85);
-            border-top: 1px solid #555;
-            padding: 10px;
-            box-sizing: border-box;
-            z-index: 10;
+            height: 130px;
+            /* Fixed height ~3 lines + header */
+            background: #252525;
+            border: 1px solid #444;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
             overflow-y: auto;
             color: #ddd;
             font-size: 0.85rem;
-            display: flex;
-            flex-direction: column;
+            box-sizing: border-box;
+            border-radius: 8px;
         }
+
 
         #log-panel h3 {
             margin: 0;
-            padding: 0 0 5px 0;
-            font-size: 0.9rem;
-            color: #aaa;
+            padding: 10px;
+            font-size: 1.1rem;
+            color: #ddd;
             border-bottom: 1px solid #444;
             position: sticky;
             top: 0;
-            background: rgba(0, 0, 0, 0.85);
+            background: #252525;
             /* For sticky header */
+            z-index: 5;
         }
 
         .key-display {
@@ -227,6 +263,8 @@
 
         #last-action-log {
             flex-grow: 1;
+            padding: 10px;
+            /* Added padding for content */
         }
 
         .log-entry {
@@ -252,17 +290,21 @@
             margin-left: 10px;
         }
 
-        /* Instructions Panel - Side */
+        /* Instructions Panel - Bottom */
         #instructions {
-            width: 250px;
+            width: 100%;
+            /* Will adapt to flex container in top-row */
             background: #252525;
-            padding: 20px;
+            padding: 10px;
+            /* Reduced from 20px */
             border-radius: 8px;
             font-size: 0.9rem;
             border: 1px solid #444;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            /* Height match game container roughly or auto */
-            max-height: 600px;
+            height: 480px;
+            max-width: 300px;
+            /* Side panel limit */
+            flex: 1;
             overflow-y: auto;
         }
     </style>
@@ -271,122 +313,147 @@
 <body>
 
     <div class="layout-wrapper">
-        <div id="stats-panel">
-            <div style="margin-bottom: 10px; font-size: 1.1rem; border-bottom: 1px solid #555; padding-bottom: 5px;">
-                <strong>STATISTICS</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                <span>SUCCESS: <span id="success-count"
-                        style="color:var(--success-color); font-weight:bold;">0</span></span>
-                <span>FAIL: <span id="fail-count" style="color:var(--fail-color); font-weight:bold;">0</span></span>
-            </div>
-
-            <div style="margin-top:10px;"><strong>INPUT STATE</strong></div>
-            <div id="keys-container" style="background: rgba(255,255,255,0.05); padding: 5px; border-radius: 4px;">
-                <div style="display: flex; justify-content: center;">
-                    <span class="key-display" id="key-q">Q</span>
-                    <span class="key-display" id="key-w">W</span>
-                    <span class="key-display" id="key-e">E</span>
+        <div class="top-row">
+            <div id="stats-panel">
+                <div
+                    style="margin: -15px -15px 15px -15px; padding: 10px; font-size: 1.1rem; border-bottom: 1px solid #444; background: #252525; color: #ddd; border-radius: 8px 8px 0 0;">
+                    <strong>통계 (STATISTICS)</strong>
                 </div>
-                <div style="display: flex; justify-content: center;">
-                    <span class="key-display" id="key-a">A</span>
-                    <span class="key-display" id="key-s">S</span>
-                    <span class="key-display" id="key-d">D</span>
+                <!-- ... Stats content ... -->
+                <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                    <span>SUCCESS: <span id="success-count"
+                            style="color:var(--success-color); font-weight:bold;">0</span></span>
+                    <span>FAIL: <span id="fail-count" style="color:var(--fail-color); font-weight:bold;">0</span></span>
                 </div>
-                <div style="display: flex; justify-content: center; margin-top: 4px;">
-                    <span class="key-display" id="key-c" style="width: 80px;">C</span>
-                    <span class="key-display" id="key-space" style="width: 80px;">SPACE</span>
+
+                <div style="margin-top:10px;"><strong>입력 상태 (INPUT)</strong></div>
+                <div id="keys-container" style="background: rgba(255,255,255,0.05); padding: 5px; border-radius: 4px;">
+                    <div style="display: flex; justify-content: center;">
+                        <span class="key-display" id="key-q">Q</span>
+                        <span class="key-display" id="key-w">W</span>
+                        <span class="key-display" id="key-e">E</span>
+                    </div>
+                    <div style="display: flex; justify-content: center;">
+                        <span class="key-display" id="key-a">A</span>
+                        <span class="key-display" id="key-s">S</span>
+                        <span class="key-display" id="key-d">D</span>
+                    </div>
+                    <div style="display: flex; justify-content: center; margin-top: 4px;">
+                        <span class="key-display" id="key-c" style="width: 80px;">C</span>
+                        <span class="key-display" id="key-space" style="width: 80px;">SPACE</span>
+                    </div>
+                </div>
+
+                <div style="margin-top:10px; border-top: 1px solid #555; padding-top: 10px;">
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>
+                            <input type="checkbox" id="interval-check-toggle">
+                            입력 리듬 체크
+                        </span>
+                        <span style="color:#aaa; font-size:0.8rem;">
+                            Q/A/C 간격
+                        </span>
+                    </label>
+                </div>
+                <div style="margin-top:15px; border-top: 1px solid #555; padding-top: 10px;">
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>
+                            <input type="checkbox" id="server-delay-toggle">
+                            Server Delay
+                        </span>
+                        <span style="color: var(--accent-color)">
+                            <span id="delay-value">100</span>ms
+                        </span>
+                    </label>
+                    <input type="range" id="delay-slider" min="30" max="200" step="10" value="100" disabled>
+                </div>
+
+                <div style="margin-top:10px; border-top: 1px solid #555; padding-top: 10px;">
+                    <label for="max-window-slider" style="display: flex; justify-content: space-between;">
+                        <span>Max Window</span>
+                        <span style="color: var(--accent-color)"><span id="max-window-value">120</span>ms</span>
+                    </label>
+                    <input type="range" id="max-window-slider" min="100" max="200" step="1" value="120">
+                </div>
+
+                <div style="margin-top:10px; border-top: 1px solid #555; padding-top: 10px;">
+                    <label for="stop-slider" style="display: flex; justify-content: space-between;">
+                        <span>Ref. Stop Time</span>
+                        <span style="color: var(--accent-color)"><span id="stop-value">0.20</span>s</span>
+                    </label>
+                    <input type="range" id="stop-slider" min="0" max="500" step="10" value="200">
                 </div>
             </div>
 
-            <div style="margin-top:10px; border-top: 1px solid #555; padding-top: 10px;">
-                <label style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>
-                        <input type="checkbox" id="interval-check-toggle">
-                        입력 리듬 체크
-                    </span>
-                    <span style="color:#aaa; font-size:0.8rem;">
-                        Q/A/C 간격
-                    </span>
-                </label>
-            </div>
-            <div style="margin-top:15px; border-top: 1px solid #555; padding-top: 10px;">
-                <label style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>
-                        <input type="checkbox" id="server-delay-toggle">
-                        Server Delay
-                    </span>
-                    <span style="color: var(--accent-color)">
-                        <span id="delay-value">100</span>ms
-                    </span>
-                </label>
-                <input type="range" id="delay-slider" min="30" max="200" step="10" value="100" disabled>
+            <div id="game-container">
+                <div class="game-header"><strong>게임 화면 (SCENE)</strong></div>
+                <div id="feedback-overlay"></div>
+
+                <div class="scene">
+                    <div id="cover">담장</div>
+                    <div id="player"></div>
+                </div>
             </div>
 
-            <div style="margin-top:10px; border-top: 1px solid #555; padding-top: 10px;">
-                <label for="max-window-slider" style="display: flex; justify-content: space-between;">
-                    <span>Max Window</span>
-                    <span style="color: var(--accent-color)"><span id="max-window-value">120</span>ms</span>
-                </label>
-                <input type="range" id="max-window-slider" min="100" max="200" step="1" value="120">
-            </div>
+            <div id="instructions-panel">
+                <div
+                    style="margin: -15px -15px 15px -15px; padding: 10px; font-size: 1.1rem; border-bottom: 1px solid #444; background: #252525; color: #ddd; border-radius: 8px 8px 0 0;">
+                    <strong>연습 방법 (How to)</strong>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Method -->
+                    <div>
+                        <ul style="padding-left: 20px; margin: 0; color: #ddd; line-height: 1.6; font-size: 0.85rem;">
+                            <li style="margin-bottom: 8px;">
+                                <strong>기본 루트 (정석)</strong><br>
+                                <span style="color:#aaa;">Q-A-C (나가기) ➔ 0.1초내 사격 ➔ E-D-C (복귀)</span>
+                            </li>
+                            <li>
+                                <strong>보조 루트 (피킹 생략)</strong><br>
+                                <span style="color:#aaa;">A-C ➔ 발사 ➔ E-D-C</span>
+                                <div style="font-size: 0.75rem; color: #fe8; margin-top: 2px;">
+                                    * 실전에서 이미 각이 열린 상황을 가정한 연습용.<br>
+                                    * 기본 연습은 QAC 루트를 권장합니다.
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
 
-            <div style="margin-top:10px; border-top: 1px solid #555; padding-top: 10px;">
-                <label for="stop-slider" style="display: flex; justify-content: space-between;">
-                    <span>Ref. Stop Time</span>
-                    <span style="color: var(--accent-color)"><span id="stop-value">0.20</span>s</span>
-                </label>
-                <input type="range" id="stop-slider" min="0" max="500" step="10" value="200">
+                    <!-- Left: Method Details -->
+                    <div
+                        style="margin-top:0; padding-top:0; border-top: 1px solid #444; font-size: 0.8rem; color: #888;">
+                        <br>
+                        * <b>성공 조건</b>: C 입력 후 90ms~MaxWindow 내 발사. <br>
+                        * <b>좌각</b>: QAC (또는 AC) ➔ 사격 ➔ EDC <br>
+                        * 반드시 복귀(EDC)까지 완료해야 점수가 오릅니다.
+                    </div>
+
+                    <!-- Settings -->
+                    <div style="padding-top: 10px; border-top: 1px solid #444;">
+                        <h4 style="margin: 0 0 5px 0; color: #aaa; font-size: 0.9rem;">설정</h4>
+                        <ul style="padding-left: 20px; margin: 0; color: #ccc; font-size: 0.8rem; line-height: 1.4;">
+                            <li><strong>리듬 체크</strong>: Q/A/C 간격 검사.</li>
+                            <li><strong>Delay</strong>: 핑 시뮬레이션.</li>
+                            <li><strong>Window</strong>: 유효 타격 시간.</li>
+                            <li><strong>Stop Time</strong>: 정지 타이밍 (참고).</li>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div id="game-container">
-            <div id="feedback-overlay"></div>
-
-
-
-            <div id="log-panel">
-                <h3>LAST JUDGEMENT LOG</h3>
-                <div id="last-action-log">Wait for input...</div>
-            </div>
-
-            <div class="scene">
-                <div id="cover">담장</div>
-                <div id="player"></div>
-            </div>
+        <div id="log-panel">
+            <h3>판정 로그 (LOGS)</h3>
+            <div id="last-action-log">Wait for input...</div>
         </div>
+    </div>
 
-        <div id="instructions">
-            <h3 style="margin-top:0; color: var(--accent-color); border-bottom: 1px solid #444; padding-bottom: 10px;">
-                연습 방법
-                (COMBO)</h3>
-
-            <div style="margin-bottom: 15px;">
-                <div style="font-weight:bold; color: #fff; margin-bottom:4px;">성공 조건</div>
-                <div style="color: #bbb;">QAC (나가기) ➔ 0.1초내 사격 ➔ EDC (복귀)</div>
-            </div>
-
-            <ul style="padding-left: 20px; margin: 0; color: #ddd; line-height: 1.6;">
-                <li><strong>1단계</strong>: (EDC 상태에서) <b>Q</b>➔<b>A</b>➔<b>C</b> (나가기/서기)</li>
-                <li><strong>2단계</strong>: C 직후 <b>0.1초 내</b> 발사. (90~120ms)</li>
-                <li><strong>3단계</strong>: 즉시 <b>E</b>➔<b>D</b>➔<b>C</b>를 입력하여 복귀/앉기.</li>
-            </ul>
-
-            <div style="margin-top:15px; padding-top:10px; border-top: 1px solid #444; font-size: 0.8rem; color: #888;">
-                * <b>좌각 (Left)</b>: (Q 옵션)-A-C ➔ 사격 ➔ E-D-C<br>
-                * 복귀 동작까지 완료해야 점수가 오릅니다.
-            </div>
-
-            <div style="margin-top:20px; border-top: 1px solid #444; padding-top: 10px;">
-                <h4 style="margin: 0 0 10px 0; color: #aaa;">설정 설명</h4>
-                <ul style="padding-left: 20px; margin: 0; color: #ccc; font-size: 0.85rem; line-height: 1.5;">
-                    <li><strong>입력 리듬 체크</strong>: Q/A/C 간격이 너무 빠른지 검사합니다. (교정 모드).</li>
-                    <li><strong>Server Delay</strong>: 체크 시 서버 지연(핑)을 시뮬레이션합니다. 결과가 늦게 표시됩니다.</li>
-                    <li><strong>Max Window</strong>: 유효 타격 시간 (기본 120ms). C 입력 후 이 시간 내에 발사해야 히트박스 이득이 인정됩니다.</li>
-                    <li><strong>Ref. Stop Time</strong>: 이동 정지 후 발사까지의 권장 타이밍 (참고용). 로직에는 영향을 주지 않습니다.</li>
-                </ul>
-            </div>
-        </div>
+    <div style="position: fixed; bottom: 10px; left: 10px; color: #666; font-size: 0.8rem; z-index: 10;">
+        © 2026 gwNam.
+        Licensed under the
+        <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener noreferrer">
+            Apache License, Version 2.0
+        </a>.
     </div>
 
     <script>
@@ -683,7 +750,8 @@
             }
             // Valid OR Invalid-but-typed (Deferred)
             // If preCheck.type is QAC (e.g. started with QAC), return target is EDC.
-            const targetType = (preCheck.type === 'EDC') ? 'QAC' : 'EDC';
+            // Also supports auxiliary AC type.
+            const targetType = (['QAC', 'AC'].includes(preCheck.type)) ? 'EDC' : 'QAC';
 
             pendingShot = {
                 type: targetType,
@@ -691,7 +759,7 @@
                 result: preCheck, // Store the judgement result
                 timer: setTimeout(() => {
                     if (preCheck.valid) {
-                        showFeedback(false, "콤보 실패: 복귀 입력 늦음/누락", "Missing " + targetType + " after Fire");
+                        showFeedback(false, `${targetType} -> 발사 -> EDC 실패 (복귀 누락)`, "Missing Return Sequence");
                     } else {
                         showFeedback(false, preCheck.msg, preCheck.debug);
                     }
@@ -718,32 +786,44 @@
                         mIdx = i; mKey = state.recentInputs[i].key; break;
                     }
                 }
-                if (mIdx === -1) return { valid: false, msg: "이동 입력 누락", debug: "No A/D before C" };
+                if (mIdx === -1) return { valid: false, msg: "[Unknown] -> 이동 입력 누락", debug: "No A/D before C" };
 
-                // Find Peek
+
+                // Find Peek (Optional for Auxiliary Route)
                 let pIdx = -1, pKey = '';
                 const expectedPeek = (mKey === 'a') ? 'q' : 'e';
                 for (let i = mIdx + 1; i < state.recentInputs.length; i++) {
-                    if (state.recentInputs[i].type === 'down' && ['q', 'e'].includes(state.recentInputs[i].key)) {
-                        pIdx = i; pKey = state.recentInputs[i].key; break;
+                    const evt = state.recentInputs[i];
+
+                    // Stop searching if we hit a 'sequence breaker' (C or Fire or another Move?)
+                    // If we see 'c' (down) or ' ' (down) or 'f' (down), this likely belongs to previous action.
+                    if (evt.type === 'down' && ['c', ' ', 'f'].includes(evt.key)) {
+                        break;
+                    }
+
+                    if (evt.type === 'down' && ['q', 'e'].includes(evt.key)) {
+                        pIdx = i; pKey = evt.key; break;
                     }
                 }
-                if (pIdx === -1) return { valid: false, msg: "피킹 입력 누락", debug: "No Q/E before Move" };
 
                 // Determine Type
-                const type = (expectedPeek === 'q') ? 'QAC' : 'EDC';
+                let type = '';
+                let isAuxiliary = false;
 
-                // 2. Logic Validation (Deferred Fail Checks)
+                if (pIdx !== -1) {
+                    // Standard QAC / EDC
+                    type = (expectedPeek === 'q') ? 'QAC' : 'EDC';
 
-                // Combination Check
-                if (pKey !== expectedPeek) {
-                    return { valid: false, type: type, msg: "조합 오류", debug: `${pKey}+${mKey}` };
+                    // Combination Check
+                    if (pKey !== expectedPeek) {
+                        return { valid: false, type: type, msg: `${type} -> 조합 오류 (${pKey}+${mKey})`, debug: `${pKey}+${mKey} (Expected ${expectedPeek})` };
+                    }
+                } else {
+                    // Auxiliary AC / DC
+                    isAuxiliary = true;
+                    type = (mKey === 'a') ? 'AC' : 'DC';
+                    // No peek key to check
                 }
-
-                // Move Check
-                // if (state.isMoving) {
-                //     return { valid: false, type: type, msg: "이동 중 발사", debug: "Moving" };
-                // }
 
                 // Timing Check
                 const timeSinceStanceChange = T_FIRE - state.lastStanceChange;
@@ -753,7 +833,7 @@
                     return {
                         valid: false,
                         type: type,
-                        msg: `C 이후 발사 타이밍이 서버 도달 전`,
+                        msg: `${type} -> 타이밍 빠름 (<90ms)`,
                         debug: `Too Fast (${delta}ms) < 90ms`
                     };
                 }
@@ -762,7 +842,7 @@
                     return {
                         valid: false,
                         type: type,
-                        msg: `히트박스 이득 소멸`,
+                        msg: `${type} -> 타이밍 늦음 (>${maxHitWindow}ms)`,
                         debug: `Too Slow (${delta}ms) > ${maxHitWindow}ms`
                     };
                 }
@@ -770,33 +850,50 @@
                 // Input Interval Check
                 const cEvent = state.recentInputs[cIdx];
                 const mEvent = state.recentInputs[mIdx];
-                const pEvent = state.recentInputs[pIdx];
+                // pEvent only exists for Standard type
 
-                console.log("state.recentInputs")
-                console.log(state.recentInputs)
+                let intervalsOk = true;
+                let debugIntervals = "";
 
-                console.log("event")
-                console.log(cEvent)
-                console.log(mEvent)
-                console.log(pEvent)
+                if (enableInputIntervalCheck) {
+                    const d2 = cEvent.time - mEvent.time; // Move -> Crouch
 
-                const d1 = mEvent.time - pEvent.time;
-                const d2 = cEvent.time - mEvent.time;
+                    if (d2 < PEEK_CONFIG.MIN_INTERVAL) {
+                        intervalsOk = false;
+                        debugIntervals = `M->C: ${Math.round(d2)}ms`;
+                    }
 
-                if (enableInputIntervalCheck && (d1 < PEEK_CONFIG.MIN_INTERVAL || d2 < PEEK_CONFIG.MIN_INTERVAL)) {
-                    return {
-                        valid: false,
-                        type: type,
-                        msg: "입력 너무 빠름",
-                        debug: `Intervals: ${Math.round(d1)}ms / ${Math.round(d2)}ms`
-                    };
+                    if (!isAuxiliary) {
+                        const pEvent = state.recentInputs[pIdx];
+                        const d1 = mEvent.time - pEvent.time; // Peek -> Move
+                        if (d1 < PEEK_CONFIG.MIN_INTERVAL) {
+                            intervalsOk = false;
+                            debugIntervals += (debugIntervals ? ", " : "") + `P->M: ${Math.round(d1)}ms`;
+                        }
+                    }
+
+                    if (!intervalsOk) {
+                        return {
+                            valid: false,
+                            type: type,
+                            msg: `${type} -> 입력 간격 위반`,
+                            debug: `Intervals: ${debugIntervals}`
+                        };
+                    }
                 }
 
                 // Success
+                if (isAuxiliary) {
+                    successMsg = `${type} -> 발사 -> EDC 성공 (${delta}ms)`;
+                } else {
+                    successMsg = `${type} -> 발사 -> EDC 성공 (${delta}ms)`;
+                }
+
                 return {
                     valid: true,
                     type: type,
-                    debug: `PERFECT TIMING (${delta}ms)\nServer Hit Frame`
+                    msg: successMsg,
+                    debug: `PERFECT TIMING (${delta}ms)\n${type} Route`
                 };
             }
         }
