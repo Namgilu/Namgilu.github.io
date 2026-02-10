@@ -332,7 +332,7 @@
             </ul>
 
             <div style="margin-top:15px; padding-top:10px; border-top: 1px solid #444; font-size: 0.8rem; color: #888;">
-                * <b>좌각 (Left)</b>: Q-A-C ➔ 사격 ➔ E-D-C<br>
+                * <b>좌각 (Left)</b>: (Q 옵션)-A-C ➔ 사격 ➔ E-D-C<br>
                 * 복귀 동작까지 완료해야 점수가 오릅니다.
             </div>
 
@@ -529,9 +529,9 @@
                     isCrouching = !isCrouching;
                     lastStanceChangeTime = ts;
                 }
-                if (k === 'a' || k === 'd') {
-                    isMoving = true;
-                }
+                // if (k === 'a' || k === 'd') {
+                //     isMoving = true;
+                // }
 
                 updateVisuals();
                 checkForReturnSequence(k); // Check for return sequence on every keydown
@@ -679,9 +679,9 @@
             }
 
             // Move Check
-            if (state.isMoving) {
-                return { valid: false, type: type, msg: "이동 중 발사", debug: "Moving" };
-            }
+            // if (state.isMoving) {
+            //     return { valid: false, type: type, msg: "이동 중 발사", debug: "Moving" };
+            // }
 
             // Timing Check
             const timeSinceStanceChange = T_FIRE - state.lastStanceChange;
@@ -709,6 +709,14 @@
             const cEvent = state.recentInputs[cIdx];
             const mEvent = state.recentInputs[mIdx];
             const pEvent = state.recentInputs[pIdx];
+
+            console.log("state.recentInputs")
+            console.log(state.recentInputs)
+
+            console.log("event")
+            console.log(cEvent)
+            console.log(mEvent)
+            console.log(pEvent)
 
             const d1 = mEvent.time - pEvent.time;
             const d2 = cEvent.time - mEvent.time;
