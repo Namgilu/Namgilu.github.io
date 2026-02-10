@@ -22,17 +22,23 @@
             color: var(--text-color);
             margin: 0;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             height: 100vh;
             overflow: hidden;
         }
 
+        .layout-wrapper {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
         #game-container {
             position: relative;
-            width: 800px;
-            height: 500px;
+            width: 600px;
+            height: 600px;
+            /* Increased height for log space */
             background-color: #252525;
             border: 2px solid #444;
             display: flex;
@@ -50,12 +56,13 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            z-index: 0;
         }
 
         #cover {
             position: absolute;
             width: 150px;
-            height: 200px;
+            height: 110px;
             background-color: var(--cover-color);
             z-index: 2;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
@@ -65,6 +72,8 @@
             color: rgba(255, 255, 255, 0.2);
             font-weight: bold;
             font-size: 1.2rem;
+            bottom: 250px;
+            /* Align bottom */
         }
 
         #player {
@@ -72,11 +81,15 @@
             width: 60px;
             height: 140px;
             background-color: var(--player-color);
-            z-index: 1;
+            z-index: 3;
             /* Behind cover initially */
             transition: transform 0.05s linear, background-color 0.1s;
             border-radius: 5px;
+            border-radius: 5px;
             /* Center behind cover */
+            bottom: 250px;
+            /* Align bottom */
+            transform-origin: bottom center;
         }
 
         /* Visual States */
@@ -90,13 +103,12 @@
 
         #player.crouching {
             height: 90px;
-            top: 50%;
-            /* Adjust vertical position conceptually */
+            /* top: 50% removed for bottom alignment */
         }
 
         #feedback-overlay {
             position: absolute;
-            top: 80px;
+            top: 100px;
             left: 0;
             width: 100%;
             text-align: center;
@@ -117,26 +129,49 @@
             color: var(--fail-color);
         }
 
+        /* Stats Panel - Moved to Top Left */
+        /* Stats Panel - Side */
         #stats-panel {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.7);
+            width: 250px;
+            background: #252525;
             padding: 15px;
             border-radius: 8px;
             font-size: 0.9rem;
-            z-index: 10;
+            border: 1px solid #444;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            box-sizing: border-box;
+            height: fit-content;
         }
 
-        #info-panel {
+        /* Log Panel - Bottom Full Width */
+        #log-panel {
             position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 15px;
-            border-radius: 8px;
-            text-align: right;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.85);
+            border-top: 1px solid #555;
+            padding: 10px;
+            box-sizing: border-box;
             z-index: 10;
+            overflow-y: auto;
+            color: #ddd;
+            font-size: 0.85rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #log-panel h3 {
+            margin: 0 0 5px 0;
+            font-size: 0.9rem;
+            color: #aaa;
+            border-bottom: 1px solid #444;
+            padding-bottom: 2px;
+            position: sticky;
+            top: 0;
+            background: rgba(0, 0, 0, 0.85);
+            /* For sticky header */
         }
 
         .key-display {
@@ -165,6 +200,10 @@
             margin-top: 10px;
         }
 
+        #last-action-log {
+            flex-grow: 1;
+        }
+
         .log-entry {
             margin-bottom: 4px;
             border-bottom: 1px solid #444;
@@ -183,17 +222,30 @@
         .debug-info {
             font-size: 0.75rem;
             color: #aaa;
-            margin-top: 5px;
+            margin-top: 2px;
             font-family: monospace;
+            margin-left: 10px;
+        }
+
+        /* Instructions Panel - Side */
+        #instructions {
+            width: 250px;
+            background: #252525;
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            border: 1px solid #444;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            /* Height match game container roughly or auto */
+            max-height: 600px;
+            overflow-y: auto;
         }
     </style>
 </head>
 
 <body>
 
-    <div id="game-container">
-        <div id="feedback-overlay"></div>
-
+    <div class="layout-wrapper">
         <div id="stats-panel">
             <div style="margin-bottom: 10px; font-size: 1.1rem; border-bottom: 1px solid #555; padding-bottom: 5px;">
                 <strong>STATISTICS</strong>
@@ -231,6 +283,14 @@
             </div>
 
             <div style="margin-top:10px; border-top: 1px solid #555; padding-top: 10px;">
+                <label for="max-window-slider" style="display: flex; justify-content: space-between;">
+                    <span>Max Window</span>
+                    <span style="color: var(--accent-color)"><span id="max-window-value">120</span>ms</span>
+                </label>
+                <input type="range" id="max-window-slider" min="100" max="200" step="1" value="120">
+            </div>
+
+            <div style="margin-top:10px; border-top: 1px solid #555; padding-top: 10px;">
                 <label for="stop-slider" style="display: flex; justify-content: space-between;">
                     <span>Ref. Stop Time</span>
                     <span style="color: var(--accent-color)"><span id="stop-value">0.20</span>s</span>
@@ -239,38 +299,51 @@
             </div>
         </div>
 
-        <div id="info-panel">
-            <div style="margin-bottom: 5px;"><strong>LAST JUDGEMENT</strong></div>
-            <div id="last-action-log"
-                style="font-size: 0.85rem; max-width: 300px; white-space: pre-wrap; text-align: left;">Wait for input...
+        <div id="game-container">
+            <div id="feedback-overlay"></div>
+
+
+
+            <div id="log-panel">
+                <h3>LAST JUDGEMENT LOG</h3>
+                <div id="last-action-log">Wait for input...</div>
+            </div>
+
+            <div class="scene">
+                <div id="cover">담장</div>
+                <div id="player"></div>
             </div>
         </div>
 
-        <div class="scene">
-            <div id="cover">COVER</div>
-            <div id="player"></div>
-        </div>
-    </div>
+        <div id="instructions">
+            <h3 style="margin-top:0; color: var(--accent-color); border-bottom: 1px solid #444; padding-bottom: 10px;">
+                연습 방법
+                (COMBO)</h3>
 
-    <div id="instructions"
-        style="position: absolute; right: 50px; top: 50%; transform: translateY(-50%); width: 300px; background: #252525; padding: 20px; border-radius: 8px; font-size: 0.9rem; z-index: 10; border: 1px solid #444; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-        <h3 style="margin-top:0; color: var(--accent-color); border-bottom: 1px solid #444; padding-bottom: 10px;">연습 방법
-            (COMBO)</h3>
+            <div style="margin-bottom: 15px;">
+                <div style="font-weight:bold; color: #fff; margin-bottom:4px;">성공 조건</div>
+                <div style="color: #bbb;">QAC (나가기) ➔ 0.1초내 사격 ➔ EDC (복귀)</div>
+            </div>
 
-        <div style="margin-bottom: 15px;">
-            <div style="font-weight:bold; color: #fff; margin-bottom:4px;">성공 조건</div>
-            <div style="color: #bbb;">QAC (나가기) ➔ 0.1초내 사격 ➔ EDC (복귀)</div>
-        </div>
+            <ul style="padding-left: 20px; margin: 0; color: #ddd; line-height: 1.6;">
+                <li><strong>1단계</strong>: (EDC 상태에서) <b>Q</b>➔<b>A</b>➔<b>C</b> (나가기/서기)</li>
+                <li><strong>2단계</strong>: C 직후 <b>0.1초 내</b> 발사. (90~120ms)</li>
+                <li><strong>3단계</strong>: 즉시 <b>E</b>➔<b>D</b>➔<b>C</b>를 입력하여 복귀/앉기.</li>
+            </ul>
 
-        <ul style="padding-left: 20px; margin: 0; color: #ddd; line-height: 1.6;">
-            <li><strong>1단계</strong>: (EDC 상태에서) <b>Q</b>➔<b>A</b>➔<b>C</b> (나가기/서기)</li>
-            <li><strong>2단계</strong>: C 직후 <b>0.1초 내</b> 발사. (90~120ms)</li>
-            <li><strong>3단계</strong>: 즉시 <b>E</b>➔<b>D</b>➔<b>C</b>를 입력하여 복귀/앉기.</li>
-        </ul>
+            <div style="margin-top:15px; padding-top:10px; border-top: 1px solid #444; font-size: 0.8rem; color: #888;">
+                * <b>좌각 (Left)</b>: Q-A-C ➔ 사격 ➔ E-D-C<br>
+                * 복귀 동작까지 완료해야 점수가 오릅니다.
+            </div>
 
-        <div style="margin-top:15px; padding-top:10px; border-top: 1px solid #444; font-size: 0.8rem; color: #888;">
-            * <b>좌각 (Left)</b>: Q-A-C ➔ 사격 ➔ E-D-C<br>
-            * 복귀 동작까지 완료해야 점수가 오릅니다.
+            <div style="margin-top:20px; border-top: 1px solid #444; padding-top: 10px;">
+                <h4 style="margin: 0 0 10px 0; color: #aaa;">설정 설명</h4>
+                <ul style="padding-left: 20px; margin: 0; color: #ccc; font-size: 0.85rem; line-height: 1.5;">
+                    <li><strong>Server Delay</strong>: 서버 응답 지연 (핑) 시뮬레이션. 판정 결과가 이 시간만큼 늦게 표시됩니다.</li>
+                    <li><strong>Max Window</strong>: 유효 타격 시간 (기본 120ms). C 입력 후 이 시간 내에 발사해야 히트박스 이득이 인정됩니다.</li>
+                    <li><strong>Ref. Stop Time</strong>: 이동 정지 후 발사까지의 권장 타이밍 (참고용). 로직에는 영향을 주지 않습니다.</li>
+                </ul>
+            </div>
         </div>
     </div>
 
@@ -284,7 +357,8 @@
 
         // --- State ---
         let serverDelay = 100;
-        let stopReq = 200; // ms
+        let maxHitWindow = 120; // ms (Max Hit Window)
+        let stopReq = 200; // ms (Ref Stop Time)
         let stats = { success: 0, fail: 0 };
 
         // Input History
@@ -312,6 +386,10 @@
 
         const delaySlider = document.getElementById('delay-slider');
         const delayValEl = document.getElementById('delay-value');
+
+        const maxWindowSlider = document.getElementById('max-window-slider');
+        const maxWindowValEl = document.getElementById('max-window-value');
+
         const stopSlider = document.getElementById('stop-slider');
         const stopValEl = document.getElementById('stop-value');
 
@@ -330,6 +408,11 @@
         delaySlider.addEventListener('input', (e) => {
             serverDelay = parseInt(e.target.value);
             delayValEl.innerText = serverDelay;
+        });
+
+        maxWindowSlider.addEventListener('input', (e) => {
+            maxHitWindow = parseInt(e.target.value);
+            maxWindowValEl.innerText = maxHitWindow;
         });
 
         stopSlider.addEventListener('input', (e) => {
@@ -360,7 +443,7 @@
             // Prompt implies user PRESSES C as part of combo.
             if (isCrouching) {
                 height = 90;
-                transform += 'translateY(25px) '; // Visually lower
+                transform += 'translateY(0px) '; // Visually lower
             }
 
             // Movement / Lean Logic
@@ -510,6 +593,8 @@
                 recentInputs: inputLog.slice(0, 20).map(i => ({ ...i })),
             };
 
+            const preCheck = checkPreFireConditions(stateSnapshot);
+
             // Immediate Check (Simulated Delay comes later if successful)
             // Actually, we must delay the JUDGEMENT, but we can verify logic now.
             // If we delay logic, we can't track "future" inputs for post-fire easily without complex async.
@@ -519,25 +604,34 @@
             // 3. If valid -> Start "Wait for Return" mode.
             // 4. In KeyDown, if Return completes -> Schedule Success Feedback (delayed from completion time).
 
-            const preCheck = checkPreFireConditions(stateSnapshot);
+            // DEFERRED FEEDBACK LOGIC
+            // If invalid but TYPE is known (e.g. Too Fast/Slow), we wait for return.
+            // If invalid and NO TYPE (e.g. just random clicking), fail immediately.
 
-            if (!preCheck.valid) {
+            if (!preCheck.valid && !preCheck.type) {
                 setTimeout(() => {
                     showFeedback(false, preCheck.msg, preCheck.debug);
                 }, serverDelay);
                 return;
             }
 
-            // Valid Pre-Fire! Now wait for return.
+            // Valid OR Invalid-but-typed (Deferred)
+            // If preCheck.type is QAC (e.g. started with QAC), return target is EDC.
             const targetType = (preCheck.type === 'EDC') ? 'QAC' : 'EDC';
 
             pendingShot = {
                 type: targetType,
                 fireTime: fireTime,
-                debugMsg: preCheck.debug,
+                result: preCheck, // Store the judgement result
                 timer: setTimeout(() => {
                     // Time expired waiting for return
-                    showFeedback(false, "콤보 실패: 복귀 입력 늦음/누락", "Missing " + targetType + " after Fire");
+                    // If the original result was valid, this is a failure (Return Missing).
+                    // If original was invalid, show that failure.
+                    if (preCheck.valid) {
+                        showFeedback(false, "콤보 실패: 복귀 입력 늦음/누락", "Missing " + targetType + " after Fire");
+                    } else {
+                        showFeedback(false, preCheck.msg, preCheck.debug); // Show the deferred failure
+                    }
                     pendingShot = null;
                 }, 1200 + serverDelay) // 1.2s timeout inclusive of delay
             };
@@ -550,40 +644,10 @@
         function checkPreFireConditions(state) {
             const T_FIRE = state.fireTime;
 
-            // 1. Moving?
-            if (state.isMoving) return { valid: false, msg: "이동 중 발사", debug: "Moving" };
-
-            // 2. TIMING CHECK (New Core Logic)
-            // C Input -> Fire Delta
-            const timeSinceStanceChange = T_FIRE - state.lastStanceChange;
-            const delta = Math.round(timeSinceStanceChange);
-
-            // Range: 90ms ~ 120ms is PERFECT
-            // < 90ms: Too Fast
-            // > 120ms: Too Slow
-
-            if (delta < 90) {
-                return {
-                    valid: false,
-                    msg: `C 이후 발사 타이밍이 서버 도달 전`,
-                    debug: `Too Fast (${delta}ms) < 90ms`
-                };
-            }
-
-            if (delta > 120) {
-                return {
-                    valid: false,
-                    msg: `히트박스 이득 소멸`,
-                    debug: `Too Slow (${delta}ms) > 120ms`
-                };
-            }
-
-            // 4. Pattern?
+            // 1. Pattern Detection (First Priority)
             // Find Stand-Up (C Down)
             const cIdx = state.recentInputs.findIndex(i => i.key === 'c' && i.type === 'down' && i.time <= T_FIRE);
-            if (cIdx === -1) return { valid: false, msg: "C 입력 없음", debug: "No C found" };
-
-            const cEvent = state.recentInputs[cIdx];
+            if (cIdx === -1) return { valid: false, msg: "C 입력 없음", debug: "No C found" }; // Immediate Fail
 
             // Find Move
             let mIdx = -1, mKey = '';
@@ -593,7 +657,6 @@
                 }
             }
             if (mIdx === -1) return { valid: false, msg: "이동 입력 누락", debug: "No A/D before C" };
-            const mEvent = state.recentInputs[mIdx];
 
             // Find Peek
             let pIdx = -1, pKey = '';
@@ -605,19 +668,55 @@
             }
             if (pIdx === -1) return { valid: false, msg: "피킹 입력 누락", debug: "No Q/E before Move" };
 
-            if (pKey !== expectedPeek) return { valid: false, msg: "조합 오류", debug: `${pKey}+${mKey}` };
+            // Determine Type
+            const type = (expectedPeek === 'q') ? 'QAC' : 'EDC';
 
+            // 2. Logic Validation (Deferred Fail Checks)
+
+            // Combination Check
+            if (pKey !== expectedPeek) {
+                return { valid: false, type: type, msg: "조합 오류", debug: `${pKey}+${mKey}` };
+            }
+
+            // Move Check
+            if (state.isMoving) {
+                return { valid: false, type: type, msg: "이동 중 발사", debug: "Moving" };
+            }
+
+            // Timing Check
+            const timeSinceStanceChange = T_FIRE - state.lastStanceChange;
+            const delta = Math.round(timeSinceStanceChange);
+
+            if (delta < 90) {
+                return {
+                    valid: false,
+                    type: type,
+                    msg: `C 이후 발사 타이밍이 서버 도달 전`,
+                    debug: `Too Fast (${delta}ms) < 90ms`
+                };
+            }
+
+            if (delta > maxHitWindow) {
+                return {
+                    valid: false,
+                    type: type,
+                    msg: `히트박스 이득 소멸`,
+                    debug: `Too Slow (${delta}ms) > ${maxHitWindow}ms`
+                };
+            }
+
+            // Input Interval Check
+            const cEvent = state.recentInputs[cIdx];
+            const mEvent = state.recentInputs[mIdx];
             const pEvent = state.recentInputs[pIdx];
 
-            // Timings logic (keep existing check for too fast input sequence)
             const d1 = mEvent.time - pEvent.time;
             const d2 = cEvent.time - mEvent.time;
 
             if (d1 < PEEK_CONFIG.MIN_INTERVAL || d2 < PEEK_CONFIG.MIN_INTERVAL)
-                return { valid: false, msg: "입력 너무 빠름", debug: `Intervals: ${Math.round(d1)}, ${Math.round(d2)}` };
+                return { valid: false, type: type, msg: "입력 너무 빠름", debug: `Intervals: ${Math.round(d1)}, ${Math.round(d2)}` };
 
-            // Pattern Found!
-            const type = (pKey === 'e') ? 'EDC' : 'QAC';
+            // Success
             return {
                 valid: true,
                 type: type,
@@ -628,53 +727,50 @@
         function checkForReturnSequence(key) {
             if (!pendingShot) return;
 
-            // We need to detect the sequence distinctively. 
-            // Simplification: Just check if the accumulated inputs AFTER fire match the pattern.
-            // Target: 'QAC' -> Q, A, C down events.
-            // Target: 'EDC' -> E, D, C down events.
+            // Strict Sequence Check for Return
+            // Target: EDC -> E, D, C (in that order)
+            // We check the last 3 'down' events since fire.
 
-            // We can check `inputLog` since `pendingShot.fireTime`.
-
+            // Get inputs since fire
             const recent = inputLog.filter(i => i.time > pendingShot.fireTime && i.type === 'down');
 
-            // We need 3 events minimum.
+            // If we have fewer than 3 inputs, we can't have completed EDC yet.
             if (recent.length < 3) return;
 
-            // Check the last 3 events
-            const last3 = recent.slice(0, 3).reverse();
-            // recent is [Newest, 2nd, 3rd]. reverse() -> [3rd, 2nd, Newest]
-            // So:
-            // last3[0] is the Oldest of the 3 (First pressed)
-            // last3[1] is the Middle
-            // last3[2] is the Newest (Last pressed)
+            // `recent` array is ordered Newest to Oldest (index 0 is newest).
+            // We want [Oldest, Middle, Newest] to be [E, D, C].
 
-            const s1 = last3[0]; // First key in sequence
-            const s2 = last3[1]; // Second key
-            const s3 = last3[2]; // Third key (Most recent)
+            const lastKey = recent[0];  // Newest (should be C)
+            const prevKey = recent[1];  // Middle (should be D)
+            const firstKey = recent[2]; // Oldest (should be E)
+
+            // 1. Trigger Check: Must be the 'c' key press that finishes it.
+            if (key !== 'c') return;
+            if (lastKey.key !== 'c') return; // Double check history
 
             let matched = false;
 
-            if (pendingShot.type === 'QAC') {
-                if (s1.key === 'q' && s2.key === 'a' && s3.key === 'c') matched = true;
+            if (pendingShot.type === 'EDC') {
+                // Expect E -> D -> C
+                if (firstKey.key === 'e' && prevKey.key === 'd' && lastKey.key === 'c') matched = true;
             } else {
-                if (s1.key === 'e' && s2.key === 'd' && s3.key === 'c') matched = true;
+                // Expect Q -> A -> C (if hypothetical Right Peek started)
+                if (firstKey.key === 'q' && prevKey.key === 'a' && lastKey.key === 'c') matched = true;
             }
 
             if (matched) {
-                // Success!
+                // Success (or Resolved Failure)
                 clearTimeout(pendingShot.timer);
 
-                // Schedule success feedback with server delay? 
-                // Or just show it now + delay?
-                // The real server would judge after it receives the C packet.
+                const delayWait = serverDelay;
 
-                const finishTime = s3.time;
-                const delayWait = serverDelay; // Simple approximate
-
-                const debug = pendingShot.debugMsg + `\nReturn: ${pendingShot.type} OK`;
+                // Use stored result
+                const isSuccess = pendingShot.result.valid;
+                const msg = pendingShot.result.msg || "서버 판정 프레임 명중 (90~120ms)";
+                const debug = pendingShot.result.debug + `\nReturn: ${pendingShot.type} OK`;
 
                 setTimeout(() => {
-                    showFeedback(true, "서버 판정 프레임 명중 (90~120ms)", debug);
+                    showFeedback(isSuccess, msg, debug);
                 }, delayWait);
 
                 pendingShot = null;
