@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUBG Peeking Practice (EDC/QAC)</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --text-color: #e0e0e0;
+            --accent-color: #f0a500;
+            --success-color: #4caf50;
+            --fail-color: #f44336;
+            --cover-color: #555;
+            --player-color: #fff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 500px;
+            background-color: #252525;
+            border: 2px solid #444;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* 3D-like Perspective */
+        .scene {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            perspective: 800px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #cover {
+            position: absolute;
+            width: 150px;
+            height: 200px;
+            background-color: var(--cover-color);
+            z-index: 2;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: rgba(255, 255, 255, 0.2);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        #player {
+            position: absolute;
+            width: 60px;
+            height: 140px;
+            background-color: var(--player-color);
+            z-index: 1;
+            /* Behind cover initially */
+            transition: transform 0.05s linear, background-color 0.1s;
+            border-radius: 5px;
+            /* Center behind cover */
+        }
+
+        /* Visual States */
+        #player.leaning-left {
+            transform: translateX(-60px) rotateZ(-15deg);
+        }
+
+        #player.leaning-right {
+            transform: translateX(60px) rotateZ(15deg);
+        }
+
+        #player.crouching {
+            height: 90px;
+            top: 50%;
+            /* Adjust vertical position conceptually */
+        }
+
+        #feedback-overlay {
+            position: absolute;
+            top: 80px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            pointer-events: none;
+            z-index: 20;
+            text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.9);
+            min-height: 2.5rem;
+        }
+
+        .msg-success {
+            color: var(--success-color);
+        }
+
+        .msg-fail {
+            color: var(--fail-color);
+        }
+
+        #stats-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            z-index: 10;
+        }
+
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: right;
+            z-index: 10;
+        }
+
+        .key-display {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 2px;
+            border: 1px solid #666;
+            border-radius: 4px;
+            background: #333;
+            color: #888;
+            font-weight: bold;
+            min-width: 1.2rem;
+            text-align: center;
+        }
+
+        .key-display.active {
+            background: var(--accent-color);
+            color: #000;
+            border-color: var(--accent-color);
+            transform: translateY(2px);
+        }
+
+        /* Input Range Styling */
+        input[type="range"] {
+            width: 200px;
+            margin-top: 10px;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 2px;
+            display: block;
+        }
+
+        .log-entry.error {
+            color: #fe8888;
+        }
+
+        .log-entry.ok {
+            color: #88fe88;
+        }
+
+        .debug-info {
+            font-size: 0.75rem;
+            color: #aaa;
+            margin-top: 5px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <div id="feedback-overlay"></div>
+
+        <div id="stats-panel">
+            <div style="margin-bottom: 10px; font-size: 1.1rem; border-bottom: 1px solid #555; padding-bottom: 5px;">
+                <strong>STATISTICS</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                <span>SUCCESS: <span id="success-count"
+                        style="color:var(--success-color); font-weight:bold;">0</span></span>
+                <span>FAIL: <span id="fail-count" style="color:var(--fail-color); font-weight:bold;">0</span></span>
+            </div>
+
+            <div style="margin-top:10px;"><strong>INPUT STATE</strong></div>
+            <div id="keys-container" style="background: rgba(255,255,255,0.05); padding: 5px; border-radius: 4px;">
+                <div style="display: flex; justify-content: center;">
+                    <span class="key-display" id="key-q">Q</span>
+                    <span class="key-display" id="key-w">W</span>
+                    <span class="key-display" id="key-e">E</span>
+                </div>
+                <div style="display: flex; justify-content: center;">
+                    <span class="key-display" id="key-a">A</span>
+                    <span class="key-display" id="key-s">S</span>
+                    <span class="key-display" id="key-d">D</span>
+                </div>
+                <div style="display: flex; justify-content: center; margin-top: 4px;">
+                    <span class="key-display" id="key-c" style="width: 80px;">C</span>
+                    <span class="key-display" id="key-space" style="width: 80px;">SPACE</span>
+                </div>
+            </div>
+
+            <div style="margin-top:15px; border-top: 1px solid #555; padding-top: 10px;">
+                <label for="delay-slider" style="display: flex; justify-content: space-between;">
+                    <span>Server Delay</span>
+                    <span style="color: var(--accent-color)"><span id="delay-value">100</span>ms</span>
+                </label>
+                <input type="range" id="delay-slider" min="0" max="300" value="100">
+            </div>
+
+            <div style="margin-top:10px; border-top: 1px solid #555; padding-top: 10px;">
+                <label for="stop-slider" style="display: flex; justify-content: space-between;">
+                    <span>Stop Time Req.</span>
+                    <span style="color: var(--accent-color)"><span id="stop-value">0.20</span>s</span>
+                </label>
+                <input type="range" id="stop-slider" min="0" max="500" step="10" value="200">
+            </div>
+        </div>
+
+        <div id="info-panel">
+            <div style="margin-bottom: 5px;"><strong>LAST JUDGEMENT</strong></div>
+            <div id="last-action-log"
+                style="font-size: 0.85rem; max-width: 300px; white-space: pre-wrap; text-align: left;">Wait for input...
+            </div>
+        </div>
+
+        <div class="scene">
+            <div id="cover">COVER</div>
+            <div id="player"></div>
+        </div>
+    </div>
+
+    <div id="instructions"
+        style="position: absolute; right: 50px; top: 50%; transform: translateY(-50%); width: 300px; background: #252525; padding: 20px; border-radius: 8px; font-size: 0.9rem; z-index: 10; border: 1px solid #444; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+        <h3 style="margin-top:0; color: var(--accent-color); border-bottom: 1px solid #444; padding-bottom: 10px;">연습 방법
+            (COMBO)</h3>
+
+        <div style="margin-bottom: 15px;">
+            <div style="font-weight:bold; color: #fff; margin-bottom:4px;">성공 조건</div>
+            <div style="color: #bbb;">EDC (나가기) ➔ 사격 ➔ QAC (복귀)</div>
+        </div>
+
+        <ul style="padding-left: 20px; margin: 0; color: #ddd; line-height: 1.6;">
+            <li><strong>1단계</strong>: <b>E</b>(기울이기) ➔ <b>D</b>(이동) ➔ <b>C</b>(서기)</li>
+            <li><strong>2단계</strong>: 정지 시간(설정값) 만큼 대기.</li>
+            <li><strong>3단계</strong>: <b>SPACE</b>를 눌러 사격.</li>
+            <li><strong>4단계</strong>: 즉시 <b>Q</b>➔<b>A</b>➔<b>C</b>를 입력하여 복귀.</li>
+        </ul>
+
+        <div style="margin-top:15px; padding-top:10px; border-top: 1px solid #444; font-size: 0.8rem; color: #888;">
+            * <b>우각 (Right)</b>: E-D-C ➔ 사격 ➔ Q-A-C<br>
+            * <b>좌각 (Left)</b>: Q-A-C ➔ 사격 ➔ E-D-C<br>
+            * 복귀 동작까지 완료해야 점수가 오릅니다.
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const PEEK_CONFIG = {
+            MIN_INTERVAL: 80,    // ms
+            MAX_INTERVAL: 300,   // ms
+            // STOP_REQ is now dynamic
+        };
+
+        // --- State ---
+        let serverDelay = 100;
+        let stopReq = 200; // ms
+        let stats = { success: 0, fail: 0 };
+
+        // Input History
+        // Format: { key: string, time: number, type: 'down'|'up' }
+        const inputLog = [];
+        const MAX_HISTORY = 50;
+
+        // Current Active Keys (for visuals & logic)
+        const activeKeys = new Set();
+
+        // Movement State Tracking
+        let lastMovementReleaseTime = 0; // When A/D were last FULLY released
+        let lastStanceChangeTime = 0;    // When C was last pressed (Stand OR Crouch)
+        let isCrouching = true;          // Start Crouched (as per prompt implication for "Standing up to shoot")
+        let isMoving = false; // A or D held
+
+        function now() { return performance.now(); }
+
+        // --- Elements ---
+        const playerEl = document.getElementById('player');
+        const feedbackEl = document.getElementById('feedback-overlay');
+        const successCountEl = document.getElementById('success-count');
+        const failCountEl = document.getElementById('fail-count');
+        const actionLogEl = document.getElementById('last-action-log');
+
+        const delaySlider = document.getElementById('delay-slider');
+        const delayValEl = document.getElementById('delay-value');
+        const stopSlider = document.getElementById('stop-slider');
+        const stopValEl = document.getElementById('stop-value');
+
+        const keyEls = {
+            'q': document.getElementById('key-q'),
+            'w': document.getElementById('key-w'),
+            'e': document.getElementById('key-e'),
+            'a': document.getElementById('key-a'),
+            's': document.getElementById('key-s'), // Included for layout consistency
+            'd': document.getElementById('key-d'),
+            'c': document.getElementById('key-c'),
+            ' ': document.getElementById('key-space')  // Changed to ' ' key
+        };
+
+        // --- UI Updates ---
+        delaySlider.addEventListener('input', (e) => {
+            serverDelay = parseInt(e.target.value);
+            delayValEl.innerText = serverDelay;
+        });
+
+        stopSlider.addEventListener('input', (e) => {
+            stopReq = parseInt(e.target.value);
+            stopValEl.innerText = (stopReq / 1000).toFixed(2);
+        });
+
+        function updateVisuals() {
+            // Update Key Highlights
+            for (const k in keyEls) {
+                let isActive = activeKeys.has(k);
+
+                // For Crouch (C), use the toggle state
+                if (k === 'c') {
+                    isActive = isCrouching;
+                }
+
+                if (isActive) keyEls[k].classList.add('active');
+                else keyEls[k].classList.remove('active');
+            }
+
+            // Client Visuals - Immediate Response
+            let transform = '';
+            let height = 140; /* Default Standing Height */
+
+            // Note: Visual height change logic
+            // In PUBG, C toggles, but here we track holding or simple state.
+            // Prompt implies user PRESSES C as part of combo.
+            if (isCrouching) {
+                height = 90;
+                transform += 'translateY(25px) '; // Visually lower
+            }
+
+            // Movement / Lean Logic
+            const leanLeft = activeKeys.has('q');
+            const leanRight = activeKeys.has('e');
+            const moveLeft = activeKeys.has('a');
+            const moveRight = activeKeys.has('d');
+
+            let xOffset = 0;
+            let rotate = 0;
+
+            // Simple priority logic for visuals
+            if (leanLeft) {
+                xOffset = -70;
+                rotate = -15;
+            } else if (leanRight) {
+                xOffset = 70;
+                rotate = 15;
+            } else if (moveLeft) {
+                xOffset = -40;
+            } else if (moveRight) {
+                xOffset = 40;
+            }
+
+            if (rotate !== 0) {
+                transform += `translateX(${xOffset}px) rotateZ(${rotate}deg) `;
+            } else {
+                transform += `translateX(${xOffset}px) `;
+            }
+
+            playerEl.style.height = height + 'px';
+            playerEl.style.transform = transform;
+        }
+
+        // --- Input Handling ---
+        // Map physical keys to logical actions
+        const KEY_MAP = {
+            'KeyQ': 'q',
+            'KeyW': 'w',
+            'KeyE': 'e',
+            'KeyA': 'a',
+            'KeyS': 's',
+            'KeyD': 'd',
+            'KeyC': 'c',
+            'Space': ' ',
+            'KeyF': 'f'
+        };
+
+        let pendingShot = null; // { type: 'EDC'|'QAC', fireTime: number, timer: number }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+
+            // Prevent scrolling for game keys
+            if (KEY_MAP[e.code] || e.code === 'Space') {
+                // Only prevent default if it's a game key to avoid blocking F12/Refresh etc if they clash, 
+                // but Space definitely needs it.
+                if (e.code === 'Space') e.preventDefault();
+            }
+
+            const code = e.code;
+            let k = KEY_MAP[code];
+            if (!k) return; // Ignore non-game keys
+
+            // Fire Logic
+            if (k === ' ' || k === 'f') {
+                handleFire();
+                activeKeys.add(' '); // Visual feedback
+                setTimeout(() => activeKeys.delete(' '), 100);
+                updateVisuals();
+                return;
+            }
+
+            if (keyEls[k]) {
+                activeKeys.add(k);
+                const ts = now();
+                inputLog.unshift({ key: k, time: ts, type: 'down' });
+                if (inputLog.length > MAX_HISTORY) inputLog.pop();
+
+                // State Updates
+                if (k === 'c') {
+                    // Toggle Crouch
+                    isCrouching = !isCrouching;
+                    lastStanceChangeTime = ts;
+                }
+                if (k === 'a' || k === 'd') {
+                    isMoving = true;
+                }
+
+                updateVisuals();
+                checkForReturnSequence(k); // Check for return sequence on every keydown
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const code = e.code;
+            let k = KEY_MAP[code];
+            if (!k) return;
+
+            if (k === ' ' || k === 'f') {
+                activeKeys.delete(' ');
+                updateVisuals();
+                return;
+            }
+
+            if (keyEls[k]) {
+                activeKeys.delete(k);
+                const ts = now();
+                inputLog.unshift({ key: k, time: ts, type: 'up' });
+                if (inputLog.length > MAX_HISTORY) inputLog.pop();
+
+                // State Updates
+                // Note: C is now Toggle, so we don't change state on keyup
+
+                if (k === 'a' || k === 'd') {
+                    // Check if other movement key is still held
+                    const moving = activeKeys.has('a') || activeKeys.has('d');
+                    isMoving = moving;
+                    if (!moving) {
+                        lastMovementReleaseTime = ts;
+                    }
+                }
+                updateVisuals();
+            }
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.button === 0) { // Left Click
+                handleFire();
+            }
+        });
+
+        // --- Core Logic ---
+
+        function handleFire() {
+            if (pendingShot) return; // Prevent double firing overlap logic
+
+            const fireTime = now();
+
+            // Capture state
+            const stateSnapshot = {
+                fireTime: fireTime,
+                isCrouching: isCrouching,
+                isMoving: isMoving,
+                lastStop: lastMovementReleaseTime,
+                lastStanceChange: lastStanceChangeTime,
+                recentInputs: inputLog.slice(0, 20).map(i => ({ ...i })),
+            };
+
+            // Immediate Check (Simulated Delay comes later if successful)
+            // Actually, we must delay the JUDGEMENT, but we can verify logic now.
+            // If we delay logic, we can't track "future" inputs for post-fire easily without complex async.
+            // Approach: 
+            // 1. Validate Pre-Fire State immediately.
+            // 2. If invalid -> Schedule Fail Feedback (delayed).
+            // 3. If valid -> Start "Wait for Return" mode.
+            // 4. In KeyDown, if Return completes -> Schedule Success Feedback (delayed from completion time).
+
+            const preCheck = checkPreFireConditions(stateSnapshot);
+
+            if (!preCheck.valid) {
+                setTimeout(() => {
+                    showFeedback(false, preCheck.msg, preCheck.debug);
+                }, serverDelay);
+                return;
+            }
+
+            // Valid Pre-Fire! Now wait for return.
+            const targetType = (preCheck.type === 'EDC') ? 'QAC' : 'EDC';
+
+            pendingShot = {
+                type: targetType,
+                fireTime: fireTime,
+                debugMsg: preCheck.debug,
+                timer: setTimeout(() => {
+                    // Time expired waiting for return
+                    showFeedback(false, "콤보 실패: 복귀 입력 늦음/누락", "Missing " + targetType + " after Fire");
+                    pendingShot = null;
+                }, 1200 + serverDelay) // 1.2s timeout inclusive of delay
+            };
+
+            // We mimic "Server Logic" by just holding this state. 
+            // Real inputs will clear it.
+        }
+
+        // Check if Pre-Fire execution (EDC->Fire) was good
+        function checkPreFireConditions(state) {
+            const T_FIRE = state.fireTime;
+
+            // 1. Moving?
+            if (state.isMoving) return { valid: false, msg: "이동 중 발사", debug: "Moving" };
+
+            // 2. Standing?
+            if (state.isCrouching) return { valid: false, msg: "앉아 쏴: 서서 쏴야 함", debug: "Must Stand" };
+
+            // 3. Stop Time?
+            const timeSinceStop = T_FIRE - state.lastStop;
+            const timeSinceStanceChange = T_FIRE - state.lastStanceChange;
+            const minWait = Math.min(timeSinceStop, timeSinceStanceChange);
+
+            if (minWait < stopReq) {
+                return {
+                    valid: false,
+                    msg: `정지 시간 부족`,
+                    debug: `Stop: ${Math.round(timeSinceStop)}ms, Stand: ${Math.round(timeSinceStanceChange)}ms < ${stopReq}ms`
+                };
+            }
+
+            // 4. Pattern?
+            // Find Stand-Up (C Down)
+            const cIdx = state.recentInputs.findIndex(i => i.key === 'c' && i.type === 'down' && i.time <= T_FIRE);
+            if (cIdx === -1) return { valid: false, msg: "C 입력 없음", debug: "No C found" };
+
+            const cEvent = state.recentInputs[cIdx];
+
+            // Find Move
+            let mIdx = -1, mKey = '';
+            for (let i = cIdx + 1; i < state.recentInputs.length; i++) {
+                if (state.recentInputs[i].type === 'down' && ['a', 'd'].includes(state.recentInputs[i].key)) {
+                    mIdx = i; mKey = state.recentInputs[i].key; break;
+                }
+            }
+            if (mIdx === -1) return { valid: false, msg: "이동 입력 누락", debug: "No A/D before C" };
+            const mEvent = state.recentInputs[mIdx];
+
+            // Find Peek
+            let pIdx = -1, pKey = '';
+            const expectedPeek = (mKey === 'a') ? 'q' : 'e';
+            for (let i = mIdx + 1; i < state.recentInputs.length; i++) {
+                if (state.recentInputs[i].type === 'down' && ['q', 'e'].includes(state.recentInputs[i].key)) {
+                    pIdx = i; pKey = state.recentInputs[i].key; break;
+                }
+            }
+            if (pIdx === -1) return { valid: false, msg: "피킹 입력 누락", debug: "No Q/E before Move" };
+
+            if (pKey !== expectedPeek) return { valid: false, msg: "조합 오류", debug: `${pKey}+${mKey}` };
+
+            const pEvent = state.recentInputs[pIdx];
+
+            // Timings
+            const d1 = mEvent.time - pEvent.time;
+            const d2 = cEvent.time - mEvent.time;
+
+            if (d1 < PEEK_CONFIG.MIN_INTERVAL || d2 < PEEK_CONFIG.MIN_INTERVAL)
+                return { valid: false, msg: "너무 빠름", debug: `Intervals: ${Math.round(d1)}, ${Math.round(d2)}` };
+            if (d1 > PEEK_CONFIG.MAX_INTERVAL || d2 > PEEK_CONFIG.MAX_INTERVAL)
+                return { valid: false, msg: "너무 느림", debug: `Intervals: ${Math.round(d1)}, ${Math.round(d2)}` };
+
+            // Pattern Found!
+            const type = (pKey === 'e') ? 'EDC' : 'QAC';
+            return {
+                valid: true,
+                type: type,
+                debug: `Seq: ${type} -> Fire\nStop: ${Math.round(minWait)}ms`
+            };
+        }
+
+        function checkForReturnSequence(key) {
+            if (!pendingShot) return;
+
+            // We need to detect the sequence distinctively. 
+            // Simplification: Just check if the accumulated inputs AFTER fire match the pattern.
+            // Target: 'QAC' -> Q, A, C down events.
+            // Target: 'EDC' -> E, D, C down events.
+
+            // We can check `inputLog` since `pendingShot.fireTime`.
+
+            const recent = inputLog.filter(i => i.time > pendingShot.fireTime && i.type === 'down');
+
+            // We need 3 events minimum.
+            if (recent.length < 3) return;
+
+            // Check the last 3 events
+            const last3 = recent.slice(0, 3).reverse();
+            // recent is [Newest, 2nd, 3rd]. reverse() -> [3rd, 2nd, Newest]
+            // So:
+            // last3[0] is the Oldest of the 3 (First pressed)
+            // last3[1] is the Middle
+            // last3[2] is the Newest (Last pressed)
+
+            const s1 = last3[0]; // First key in sequence
+            const s2 = last3[1]; // Second key
+            const s3 = last3[2]; // Third key (Most recent)
+
+            let matched = false;
+
+            if (pendingShot.type === 'QAC') {
+                if (s1.key === 'q' && s2.key === 'a' && s3.key === 'c') matched = true;
+            } else {
+                if (s1.key === 'e' && s2.key === 'd' && s3.key === 'c') matched = true;
+            }
+
+            if (matched) {
+                // Success!
+                clearTimeout(pendingShot.timer);
+
+                // Schedule success feedback with server delay? 
+                // Or just show it now + delay?
+                // The real server would judge after it receives the C packet.
+
+                const finishTime = s3.time;
+                const delayWait = serverDelay; // Simple approximate
+
+                const debug = pendingShot.debugMsg + `\nReturn: ${pendingShot.type} OK`;
+
+                setTimeout(() => {
+                    showFeedback(true, "PERFECT COMBO - 성공!", debug);
+                }, delayWait);
+
+                pendingShot = null;
+            }
+        }
+
+        let feedbackTimer = null;
+
+        function showFeedback(isSuccess, msg, debugInfo = "") {
+            // Stats
+            if (isSuccess) stats.success++;
+            else stats.fail++;
+
+            successCountEl.innerText = stats.success;
+            failCountEl.innerText = stats.fail;
+
+            // UI
+            feedbackEl.innerText = msg;
+            feedbackEl.className = isSuccess ? 'msg-success' : 'msg-fail';
+
+            // Log
+            actionLogEl.innerHTML = `<div class="log-entry ${isSuccess ? 'ok' : 'error'}">` +
+                `<div>${msg}</div><div class="debug-info">${debugInfo}</div></div>` +
+                actionLogEl.innerHTML.slice(0, 1000); // Truncate history
+
+            // Visual Tint
+            playerEl.style.backgroundColor = isSuccess
+                ? getComputedStyle(document.documentElement).getPropertyValue('--success-color')
+                : getComputedStyle(document.documentElement).getPropertyValue('--fail-color');
+
+            if (feedbackTimer) clearTimeout(feedbackTimer);
+            feedbackTimer = setTimeout(() => {
+                feedbackEl.innerText = "";
+                playerEl.style.backgroundColor = "#fff"; // Reset
+                feedbackTimer = null;
+            }, 1500);
+        }
+    </script>
+</body>
+
+</html>
