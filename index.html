@@ -232,7 +232,7 @@
 
             <div style="margin-top:10px; border-top: 1px solid #555; padding-top: 10px;">
                 <label for="stop-slider" style="display: flex; justify-content: space-between;">
-                    <span>Stop Time Req.</span>
+                    <span>Ref. Stop Time</span>
                     <span style="color: var(--accent-color)"><span id="stop-value">0.20</span>s</span>
                 </label>
                 <input type="range" id="stop-slider" min="0" max="500" step="10" value="200">
@@ -259,18 +259,16 @@
 
         <div style="margin-bottom: 15px;">
             <div style="font-weight:bold; color: #fff; margin-bottom:4px;">성공 조건</div>
-            <div style="color: #bbb;">EDC (나가기) ➔ 사격 ➔ QAC (복귀)</div>
+            <div style="color: #bbb;">QAC (나가기) ➔ 0.1초내 사격 ➔ EDC (복귀)</div>
         </div>
 
         <ul style="padding-left: 20px; margin: 0; color: #ddd; line-height: 1.6;">
-            <li><strong>1단계</strong>: <b>E</b>(기울이기) ➔ <b>D</b>(이동) ➔ <b>C</b>(서기)</li>
-            <li><strong>2단계</strong>: 정지 시간(설정값) 만큼 대기.</li>
-            <li><strong>3단계</strong>: <b>SPACE</b>를 눌러 사격.</li>
-            <li><strong>4단계</strong>: 즉시 <b>Q</b>➔<b>A</b>➔<b>C</b>를 입력하여 복귀.</li>
+            <li><strong>1단계</strong>: (EDC 상태에서) <b>Q</b>➔<b>A</b>➔<b>C</b> (나가기/서기)</li>
+            <li><strong>2단계</strong>: C 직후 <b>0.1초 내</b> 발사. (90~120ms)</li>
+            <li><strong>3단계</strong>: 즉시 <b>E</b>➔<b>D</b>➔<b>C</b>를 입력하여 복귀/앉기.</li>
         </ul>
 
         <div style="margin-top:15px; padding-top:10px; border-top: 1px solid #444; font-size: 0.8rem; color: #888;">
-            * <b>우각 (Right)</b>: E-D-C ➔ 사격 ➔ Q-A-C<br>
             * <b>좌각 (Left)</b>: Q-A-C ➔ 사격 ➔ E-D-C<br>
             * 복귀 동작까지 완료해야 점수가 오릅니다.
         </div>
@@ -555,19 +553,28 @@
             // 1. Moving?
             if (state.isMoving) return { valid: false, msg: "이동 중 발사", debug: "Moving" };
 
-            // 2. Standing?
-            if (state.isCrouching) return { valid: false, msg: "앉아 쏴: 서서 쏴야 함", debug: "Must Stand" };
-
-            // 3. Stop Time?
-            const timeSinceStop = T_FIRE - state.lastStop;
+            // 2. TIMING CHECK (New Core Logic)
+            // C Input -> Fire Delta
             const timeSinceStanceChange = T_FIRE - state.lastStanceChange;
-            const minWait = Math.min(timeSinceStop, timeSinceStanceChange);
+            const delta = Math.round(timeSinceStanceChange);
 
-            if (minWait < stopReq) {
+            // Range: 90ms ~ 120ms is PERFECT
+            // < 90ms: Too Fast
+            // > 120ms: Too Slow
+
+            if (delta < 90) {
                 return {
                     valid: false,
-                    msg: `정지 시간 부족`,
-                    debug: `Stop: ${Math.round(timeSinceStop)}ms, Stand: ${Math.round(timeSinceStanceChange)}ms < ${stopReq}ms`
+                    msg: `C 이후 발사 타이밍이 서버 도달 전`,
+                    debug: `Too Fast (${delta}ms) < 90ms`
+                };
+            }
+
+            if (delta > 120) {
+                return {
+                    valid: false,
+                    msg: `히트박스 이득 소멸`,
+                    debug: `Too Slow (${delta}ms) > 120ms`
                 };
             }
 
@@ -602,21 +609,19 @@
 
             const pEvent = state.recentInputs[pIdx];
 
-            // Timings
+            // Timings logic (keep existing check for too fast input sequence)
             const d1 = mEvent.time - pEvent.time;
             const d2 = cEvent.time - mEvent.time;
 
             if (d1 < PEEK_CONFIG.MIN_INTERVAL || d2 < PEEK_CONFIG.MIN_INTERVAL)
-                return { valid: false, msg: "너무 빠름", debug: `Intervals: ${Math.round(d1)}, ${Math.round(d2)}` };
-            if (d1 > PEEK_CONFIG.MAX_INTERVAL || d2 > PEEK_CONFIG.MAX_INTERVAL)
-                return { valid: false, msg: "너무 느림", debug: `Intervals: ${Math.round(d1)}, ${Math.round(d2)}` };
+                return { valid: false, msg: "입력 너무 빠름", debug: `Intervals: ${Math.round(d1)}, ${Math.round(d2)}` };
 
             // Pattern Found!
             const type = (pKey === 'e') ? 'EDC' : 'QAC';
             return {
                 valid: true,
                 type: type,
-                debug: `Seq: ${type} -> Fire\nStop: ${Math.round(minWait)}ms`
+                debug: `PERFECT TIMING (${delta}ms)\nServer Hit Frame`
             };
         }
 
@@ -669,7 +674,7 @@
                 const debug = pendingShot.debugMsg + `\nReturn: ${pendingShot.type} OK`;
 
                 setTimeout(() => {
-                    showFeedback(true, "PERFECT COMBO - 성공!", debug);
+                    showFeedback(true, "서버 판정 프레임 명중 (90~120ms)", debug);
                 }, delayWait);
 
                 pendingShot = null;
@@ -701,12 +706,15 @@
                 : getComputedStyle(document.documentElement).getPropertyValue('--fail-color');
 
             if (feedbackTimer) clearTimeout(feedbackTimer);
+
             feedbackTimer = setTimeout(() => {
-                feedbackEl.innerText = "";
-                playerEl.style.backgroundColor = "#fff"; // Reset
+                playerEl.style.backgroundColor = ""; // Reset
                 feedbackTimer = null;
             }, 1500);
         }
+
+        // Initialize Visuals
+        updateVisuals();
     </script>
 </body>
 
