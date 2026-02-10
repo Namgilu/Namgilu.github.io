@@ -34,6 +34,31 @@
             align-items: flex-start;
         }
 
+
+
+        /* Thumb */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+        }
+
+        /* Disabled 상태 */
+        input[type="range"]:disabled {
+            background: #333;
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        input[type="range"]:disabled::-webkit-slider-thumb {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+
         #game-container {
             position: relative;
             width: 600px;
@@ -163,11 +188,11 @@
         }
 
         #log-panel h3 {
-            margin: 0 0 5px 0;
+            margin: 0;
+            padding: 0 0 5px 0;
             font-size: 0.9rem;
             color: #aaa;
             border-bottom: 1px solid #444;
-            padding-bottom: 2px;
             position: sticky;
             top: 0;
             background: rgba(0, 0, 0, 0.85);
@@ -274,12 +299,28 @@
                 </div>
             </div>
 
-            <div style="margin-top:15px; border-top: 1px solid #555; padding-top: 10px;">
-                <label for="delay-slider" style="display: flex; justify-content: space-between;">
-                    <span>Server Delay</span>
-                    <span style="color: var(--accent-color)"><span id="delay-value">100</span>ms</span>
+            <div style="margin-top:10px; border-top: 1px solid #555; padding-top: 10px;">
+                <label style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>
+                        <input type="checkbox" id="interval-check-toggle">
+                        입력 리듬 체크
+                    </span>
+                    <span style="color:#aaa; font-size:0.8rem;">
+                        Q/A/C 간격
+                    </span>
                 </label>
-                <input type="range" id="delay-slider" min="0" max="300" value="100">
+            </div>
+            <div style="margin-top:15px; border-top: 1px solid #555; padding-top: 10px;">
+                <label style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>
+                        <input type="checkbox" id="server-delay-toggle">
+                        Server Delay
+                    </span>
+                    <span style="color: var(--accent-color)">
+                        <span id="delay-value">100</span>ms
+                    </span>
+                </label>
+                <input type="range" id="delay-slider" min="30" max="200" step="10" value="100" disabled>
             </div>
 
             <div style="margin-top:10px; border-top: 1px solid #555; padding-top: 10px;">
@@ -339,7 +380,8 @@
             <div style="margin-top:20px; border-top: 1px solid #444; padding-top: 10px;">
                 <h4 style="margin: 0 0 10px 0; color: #aaa;">설정 설명</h4>
                 <ul style="padding-left: 20px; margin: 0; color: #ccc; font-size: 0.85rem; line-height: 1.5;">
-                    <li><strong>Server Delay</strong>: 서버 응답 지연 (핑) 시뮬레이션. 판정 결과가 이 시간만큼 늦게 표시됩니다.</li>
+                    <li><strong>입력 리듬 체크</strong>: Q/A/C 간격이 너무 빠른지 검사합니다. (교정 모드).</li>
+                    <li><strong>Server Delay</strong>: 체크 시 서버 지연(핑)을 시뮬레이션합니다. 결과가 늦게 표시됩니다.</li>
                     <li><strong>Max Window</strong>: 유효 타격 시간 (기본 120ms). C 입력 후 이 시간 내에 발사해야 히트박스 이득이 인정됩니다.</li>
                     <li><strong>Ref. Stop Time</strong>: 이동 정지 후 발사까지의 권장 타이밍 (참고용). 로직에는 영향을 주지 않습니다.</li>
                 </ul>
@@ -374,6 +416,8 @@
         let lastStanceChangeTime = 0;    // When C was last pressed (Stand OR Crouch)
         let isCrouching = true;          // Start Crouched (as per prompt implication for "Standing up to shoot")
         let isMoving = false; // A or D held
+        let serverDelayEnabled = false;
+        let enableInputIntervalCheck = false; // 기본 ON (교정 모드)
 
         function now() { return performance.now(); }
 
@@ -419,6 +463,22 @@
             stopReq = parseInt(e.target.value);
             stopValEl.innerText = (stopReq / 1000).toFixed(2);
         });
+
+        const serverDelayToggle = document.getElementById('server-delay-toggle');
+
+        serverDelayToggle.addEventListener('change', (e) => {
+            serverDelayEnabled = e.target.checked;
+
+            delaySlider.disabled = !serverDelayEnabled;
+            delaySlider.style.opacity = serverDelayEnabled ? '1.0' : '0.4';
+        });
+
+        const intervalToggle = document.getElementById('interval-check-toggle');
+
+        intervalToggle.addEventListener('change', (e) => {
+            enableInputIntervalCheck = e.target.checked;
+        });
+
 
         function updateVisuals() {
             // Update Key Highlights
@@ -525,9 +585,13 @@
 
                 // State Updates
                 if (k === 'c') {
-                    // Toggle Crouch
+                    const wasCrouching = isCrouching;
                     isCrouching = !isCrouching;
-                    lastStanceChangeTime = ts;
+
+                    // ❗ 앉아있다가 → 섰을 때만 기준 시간 갱신
+                    if (wasCrouching && !isCrouching) {
+                        lastStanceChangeTime = ts;
+                    }
                 }
                 // if (k === 'a' || k === 'd') {
                 //     isMoving = true;
@@ -570,10 +634,12 @@
             }
         });
 
-        window.addEventListener('mousedown', (e) => {
-            if (e.button === 0) { // Left Click
-                handleFire();
-            }
+        const sceneEl = document.querySelector('.scene');
+
+        sceneEl.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+
+            handleFire();
         });
 
         // --- Core Logic ---
@@ -607,14 +673,14 @@
             // DEFERRED FEEDBACK LOGIC
             // If invalid but TYPE is known (e.g. Too Fast/Slow), we wait for return.
             // If invalid and NO TYPE (e.g. just random clicking), fail immediately.
+            const delay = serverDelayEnabled ? serverDelay : 0;
 
             if (!preCheck.valid && !preCheck.type) {
                 setTimeout(() => {
                     showFeedback(false, preCheck.msg, preCheck.debug);
-                }, serverDelay);
+                }, delay);
                 return;
             }
-
             // Valid OR Invalid-but-typed (Deferred)
             // If preCheck.type is QAC (e.g. started with QAC), return target is EDC.
             const targetType = (preCheck.type === 'EDC') ? 'QAC' : 'EDC';
@@ -624,112 +690,115 @@
                 fireTime: fireTime,
                 result: preCheck, // Store the judgement result
                 timer: setTimeout(() => {
-                    // Time expired waiting for return
-                    // If the original result was valid, this is a failure (Return Missing).
-                    // If original was invalid, show that failure.
                     if (preCheck.valid) {
                         showFeedback(false, "콤보 실패: 복귀 입력 늦음/누락", "Missing " + targetType + " after Fire");
                     } else {
-                        showFeedback(false, preCheck.msg, preCheck.debug); // Show the deferred failure
+                        showFeedback(false, preCheck.msg, preCheck.debug);
                     }
                     pendingShot = null;
-                }, 1200 + serverDelay) // 1.2s timeout inclusive of delay
-            };
+                }, 1200 + (serverDelayEnabled ? serverDelay : 0))
 
-            // We mimic "Server Logic" by just holding this state. 
-            // Real inputs will clear it.
-        }
+                // We mimic "Server Logic" by just holding this state. 
+                // Real inputs will clear it.
+            }
 
-        // Check if Pre-Fire execution (EDC->Fire) was good
-        function checkPreFireConditions(state) {
-            const T_FIRE = state.fireTime;
+            // Check if Pre-Fire execution (EDC->Fire) was good
+            function checkPreFireConditions(state) {
+                const T_FIRE = state.fireTime;
 
-            // 1. Pattern Detection (First Priority)
-            // Find Stand-Up (C Down)
-            const cIdx = state.recentInputs.findIndex(i => i.key === 'c' && i.type === 'down' && i.time <= T_FIRE);
-            if (cIdx === -1) return { valid: false, msg: "C 입력 없음", debug: "No C found" }; // Immediate Fail
+                // 1. Pattern Detection (First Priority)
+                // Find Stand-Up (C Down)
+                const cIdx = state.recentInputs.findIndex(i => i.key === 'c' && i.type === 'down' && i.time <= T_FIRE);
+                if (cIdx === -1) return { valid: false, msg: "C 입력 없음", debug: "No C found" }; // Immediate Fail
 
-            // Find Move
-            let mIdx = -1, mKey = '';
-            for (let i = cIdx + 1; i < state.recentInputs.length; i++) {
-                if (state.recentInputs[i].type === 'down' && ['a', 'd'].includes(state.recentInputs[i].key)) {
-                    mIdx = i; mKey = state.recentInputs[i].key; break;
+                // Find Move
+                let mIdx = -1, mKey = '';
+                for (let i = cIdx + 1; i < state.recentInputs.length; i++) {
+                    if (state.recentInputs[i].type === 'down' && ['a', 'd'].includes(state.recentInputs[i].key)) {
+                        mIdx = i; mKey = state.recentInputs[i].key; break;
+                    }
                 }
-            }
-            if (mIdx === -1) return { valid: false, msg: "이동 입력 누락", debug: "No A/D before C" };
+                if (mIdx === -1) return { valid: false, msg: "이동 입력 누락", debug: "No A/D before C" };
 
-            // Find Peek
-            let pIdx = -1, pKey = '';
-            const expectedPeek = (mKey === 'a') ? 'q' : 'e';
-            for (let i = mIdx + 1; i < state.recentInputs.length; i++) {
-                if (state.recentInputs[i].type === 'down' && ['q', 'e'].includes(state.recentInputs[i].key)) {
-                    pIdx = i; pKey = state.recentInputs[i].key; break;
+                // Find Peek
+                let pIdx = -1, pKey = '';
+                const expectedPeek = (mKey === 'a') ? 'q' : 'e';
+                for (let i = mIdx + 1; i < state.recentInputs.length; i++) {
+                    if (state.recentInputs[i].type === 'down' && ['q', 'e'].includes(state.recentInputs[i].key)) {
+                        pIdx = i; pKey = state.recentInputs[i].key; break;
+                    }
                 }
-            }
-            if (pIdx === -1) return { valid: false, msg: "피킹 입력 누락", debug: "No Q/E before Move" };
+                if (pIdx === -1) return { valid: false, msg: "피킹 입력 누락", debug: "No Q/E before Move" };
 
-            // Determine Type
-            const type = (expectedPeek === 'q') ? 'QAC' : 'EDC';
+                // Determine Type
+                const type = (expectedPeek === 'q') ? 'QAC' : 'EDC';
 
-            // 2. Logic Validation (Deferred Fail Checks)
+                // 2. Logic Validation (Deferred Fail Checks)
 
-            // Combination Check
-            if (pKey !== expectedPeek) {
-                return { valid: false, type: type, msg: "조합 오류", debug: `${pKey}+${mKey}` };
-            }
+                // Combination Check
+                if (pKey !== expectedPeek) {
+                    return { valid: false, type: type, msg: "조합 오류", debug: `${pKey}+${mKey}` };
+                }
 
-            // Move Check
-            // if (state.isMoving) {
-            //     return { valid: false, type: type, msg: "이동 중 발사", debug: "Moving" };
-            // }
+                // Move Check
+                // if (state.isMoving) {
+                //     return { valid: false, type: type, msg: "이동 중 발사", debug: "Moving" };
+                // }
 
-            // Timing Check
-            const timeSinceStanceChange = T_FIRE - state.lastStanceChange;
-            const delta = Math.round(timeSinceStanceChange);
+                // Timing Check
+                const timeSinceStanceChange = T_FIRE - state.lastStanceChange;
+                const delta = Math.round(timeSinceStanceChange);
 
-            if (delta < 90) {
+                if (delta < 90) {
+                    return {
+                        valid: false,
+                        type: type,
+                        msg: `C 이후 발사 타이밍이 서버 도달 전`,
+                        debug: `Too Fast (${delta}ms) < 90ms`
+                    };
+                }
+
+                if (delta > maxHitWindow) {
+                    return {
+                        valid: false,
+                        type: type,
+                        msg: `히트박스 이득 소멸`,
+                        debug: `Too Slow (${delta}ms) > ${maxHitWindow}ms`
+                    };
+                }
+
+                // Input Interval Check
+                const cEvent = state.recentInputs[cIdx];
+                const mEvent = state.recentInputs[mIdx];
+                const pEvent = state.recentInputs[pIdx];
+
+                console.log("state.recentInputs")
+                console.log(state.recentInputs)
+
+                console.log("event")
+                console.log(cEvent)
+                console.log(mEvent)
+                console.log(pEvent)
+
+                const d1 = mEvent.time - pEvent.time;
+                const d2 = cEvent.time - mEvent.time;
+
+                if (enableInputIntervalCheck && (d1 < PEEK_CONFIG.MIN_INTERVAL || d2 < PEEK_CONFIG.MIN_INTERVAL)) {
+                    return {
+                        valid: false,
+                        type: type,
+                        msg: "입력 너무 빠름",
+                        debug: `Intervals: ${Math.round(d1)}ms / ${Math.round(d2)}ms`
+                    };
+                }
+
+                // Success
                 return {
-                    valid: false,
+                    valid: true,
                     type: type,
-                    msg: `C 이후 발사 타이밍이 서버 도달 전`,
-                    debug: `Too Fast (${delta}ms) < 90ms`
+                    debug: `PERFECT TIMING (${delta}ms)\nServer Hit Frame`
                 };
             }
-
-            if (delta > maxHitWindow) {
-                return {
-                    valid: false,
-                    type: type,
-                    msg: `히트박스 이득 소멸`,
-                    debug: `Too Slow (${delta}ms) > ${maxHitWindow}ms`
-                };
-            }
-
-            // Input Interval Check
-            const cEvent = state.recentInputs[cIdx];
-            const mEvent = state.recentInputs[mIdx];
-            const pEvent = state.recentInputs[pIdx];
-
-            console.log("state.recentInputs")
-            console.log(state.recentInputs)
-
-            console.log("event")
-            console.log(cEvent)
-            console.log(mEvent)
-            console.log(pEvent)
-
-            const d1 = mEvent.time - pEvent.time;
-            const d2 = cEvent.time - mEvent.time;
-
-            if (d1 < PEEK_CONFIG.MIN_INTERVAL || d2 < PEEK_CONFIG.MIN_INTERVAL)
-                return { valid: false, type: type, msg: "입력 너무 빠름", debug: `Intervals: ${Math.round(d1)}, ${Math.round(d2)}` };
-
-            // Success
-            return {
-                valid: true,
-                type: type,
-                debug: `PERFECT TIMING (${delta}ms)\nServer Hit Frame`
-            };
         }
 
         function checkForReturnSequence(key) {
@@ -770,12 +839,12 @@
                 // Success (or Resolved Failure)
                 clearTimeout(pendingShot.timer);
 
-                const delayWait = serverDelay;
-
                 // Use stored result
                 const isSuccess = pendingShot.result.valid;
-                const msg = pendingShot.result.msg || "서버 판정 프레임 명중 (90~120ms)";
+                const msg = pendingShot.result.msg || `서버 판정 프레임 명중 (90~${maxHitWindow}ms)`;
                 const debug = pendingShot.result.debug + `\nReturn: ${pendingShot.type} OK`;
+
+                const delayWait = serverDelayEnabled ? serverDelay : 0;
 
                 setTimeout(() => {
                     showFeedback(isSuccess, msg, debug);
